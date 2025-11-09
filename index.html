@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Caça-níquel • Appono Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap');
+
+  :root{
+    --bg:#06060b;
+    --panel:#0e1116;
+    --neon-1:#ff2fa8;
+    --neon-2:#00d0ff;
+    --muted:#9aa6b2;
+    --glass:rgba(255,255,255,0.03);
+    --danger:#ff4d4f;
+    --win:#22c55e;
+    --green-term:#0b3b0b;
+    --crt-glow:rgba(0,255,120,0.06);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:
+      radial-gradient(800px 400px at 15% 20%, rgba(0,208,255,0.03), transparent 6%),
+      radial-gradient(900px 450px at 85% 80%, rgba(255,47,168,0.03), transparent 6%),
+      var(--bg);
+    color:#e6eef8;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    min-height:100vh;
+    overflow:hidden;
+  }
+
+  /* NAVBAR */
+  .navbar{
+    position:fixed; top:0; left:0; right:0; height:68px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 20px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    backdrop-filter: blur(6px); z-index:50;
+  }
+  .nav-left, .nav-center, .nav-right{display:flex; align-items:center; gap:12px;}
+  .brand{font-weight:900; letter-spacing:1px; font-size:18px; display:flex; align-items:center; gap:10px;}
+  .chip{background:linear-gradient(90deg,var(--neon-1),var(--neon-2)); padding:6px 10px; border-radius:999px; color:#071017; font-weight:900}
+  .hud{background:var(--glass); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.02); min-width:120px; text-align:center;}
+  .hud .label{font-size:11px; color:var(--muted)}
+  .hud .value{font-weight:800; font-size:16px}
+  .nav-right .btn{background:transparent; border:1px solid rgba(255,255,255,0.04); color:var(--muted); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700;}
+  .nav-right .btn.primary{background:linear-gradient(90deg,var(--neon-1),var(--neon-2)); color:#071017; border:0;}
+
+  /* MAIN */
+  .main-wrap{display:flex; align-items:flex-start; justify-content:center; padding-top:92px; height:calc(100vh - 92px); gap:24px;}
+  .side{width:300px; max-width:22%; min-width:240px; align-self:start;}
+  .panel{background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-radius:12px; padding:12px; border:1px solid rgba(255,255,255,0.03); box-shadow:0 10px 40px rgba(0,0,0,0.6)}
+  .panel h3{margin:0 0 8px 0; color:var(--neon-2); font-size:14px}
+
+  /* CENTER MACHINE */
+  .center{width:640px; max-width:calc(100% - 520px); display:flex; flex-direction:column; align-items:center; gap:14px;}
+  .machine{width:640px; border-radius:20px; padding:18px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.15)); border:2px solid rgba(255,255,255,0.03); box-shadow:0 25px 80px rgba(0,0,0,0.6); position:relative; overflow:visible;}
+  .machine::before{content:''; position:absolute; inset:0; background-image: linear-gradient(90deg, rgba(255,47,168,0.03), transparent 30%), linear-gradient(90deg, rgba(0,208,255,0.02), transparent 70%); border-radius:18px; pointer-events:none;}
+  .topinfo{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+  .title{font-weight:900; font-size:20px; letter-spacing:1px;}
+  .subtitle{color:var(--muted); font-size:12px}
+
+  /* reels */
+  .reels-wrap{display:flex; justify-content:center; gap:16px; padding:14px; align-items:center;}
+  .reel{width:180px; height:180px; background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(255,255,255,0.02)); border-radius:12px; overflow:hidden; border:2px solid rgba(255,255,255,0.03); position:relative; box-shadow: inset 0 4px 18px rgba(0,0,0,0.6);}
+  .reel .strip{position:absolute; left:0; top:0; width:100%; display:flex; flex-direction:column; align-items:center; transform:translateY(0);}
+  .symbol{width:100%; height:180px; display:flex; align-items:center; justify-content:center; font-size:54px; font-weight:900; user-select:none; text-shadow:0 6px 28px rgba(0,0,0,0.6);}
+
+  /* controls */
+  .controls{display:flex; justify-content:center; gap:10px; align-items:center; margin-top:10px;}
+  .betbox{display:flex; gap:8px; align-items:center; background:var(--glass); padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,0.02);}
+  input[type=number]{width:120px; background:transparent; border:0; color:inherit; font-weight:700; font-size:16px; padding:6px; outline:none;}
+  .spin-btn{background:linear-gradient(90deg,var(--neon-1),var(--neon-2)); color:#071017; font-weight:900; padding:12px 20px; border-radius:12px; border:0; cursor:pointer; box-shadow:0 20px 60px rgba(255,47,168,0.08);}
+  .spin-btn.secondary{background:transparent; border:1px solid rgba(255,255,255,0.04); color:var(--muted); padding:8px 12px;}
+  .result{margin-top:10px; text-align:center; font-weight:800; font-size:15px; min-height:22px}
+  .log{height:160px; overflow:auto; font-size:13px; margin-top:12px; padding:8px; background:rgba(0,0,0,0.16); border-radius:8px;}
+
+  /* modal generic */
+  .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); z-index:120;}
+  .modal .box{width:520px; max-width:96%; padding:18px; border-radius:12px; background:#0b0f14; border:2px solid rgba(255,255,255,0.03);}
+
+  /* HACKER TERMINAL (green CRT) */
+  .terminal{
+    background: linear-gradient(180deg, #062b06, #083f08 60%);
+    border-radius:10px;
+    padding:12px;
+    border: 2px solid rgba(0,255,120,0.12);
+    box-shadow: 0 10px 40px rgba(0,255,120,0.04);
+    color:#b8ffb8;
+    font-family: "Courier New", monospace;
+    letter-spacing:1px;
+  }
+  .term-screen{
+    background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(255,255,255,0.01));
+    border-radius:6px;
+    padding:12px;
+    min-height:120px;
+    position:relative;
+    box-shadow: inset 0 0 40px rgba(0,255,120,0.02);
+    border:1px solid rgba(0,0,0,0.3);
+    overflow:hidden;
+  }
+  /* CRT scanline overlay */
+  .crt::after{
+    content:'';
+    position:absolute; inset:0; pointer-events:none;
+    background-image: linear-gradient(rgba(0,0,0,0.02) 50%, rgba(255,255,255,0.01) 51%); background-size:100% 4px;
+    mix-blend-mode:overlay; opacity:0.7;
+  }
+  .term-line{font-size:16px; margin:6px 0;}
+  .term-input{width:100%; margin-top:10px; padding:10px; border-radius:8px; background:rgba(0,0,0,0.5); color:#b8ffb8; border:1px solid rgba(0,255,120,0.06); font-family:monospace; font-weight:700;}
+
+  .term-header{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;}
+  .term-header .dot{width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,0.06); box-shadow:0 0 10px rgba(0,255,120,0.05)}
+
+  /* flicker animation */
+  @keyframes flicker {
+    0% {opacity:0.95}
+    50%{opacity:0.92}
+    100%{opacity:0.96}
+  }
+  .flicker{animation: flicker 0.12s infinite;}
+
+  .overlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:200; background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.8)); color:white;}
+  .overlay .box{background:#071017; padding:28px; border-radius:12px; text-align:center; border:2px solid rgba(255,255,255,0.03);}
+
+  .muted{color:var(--muted); font-size:13px}
+
+  /* responsive */
+  @media (max-width:1100px){
+    .side{display:none}
+    .center{width:100%}
+    .machine{width:92%}
+  }
+</style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <div class="navbar">
+    <div class="nav-left">
+      <div class="brand"><div class="chip">JP</div> Appono Simulator</div>
+      <div class="hud"><div class="label">Dinheiro</div><div id="moneyHud" class="value">$100.00</div></div>
+      <div class="hud"><div class="label">Score</div><div id="scoreHud" class="value">50</div></div>
+    </div>
+
+    <div class="nav-center">
+      <div class="hud"><div class="label">Relógio</div><div id="clockHud" class="value">Dia 1 • 00:00</div></div>
+    </div>
+
+    <div class="nav-right">
+      <button class="btn" id="openLendersBtn">Agiotas</button>
+      <button class="btn primary" id="openHackBtn">HACKER</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main-wrap">
+    <div class="side" style="align-self:flex-start">
+      <div class="panel">
+        <h3>Empréstimos Ativos</h3>
+        <div id="activeLoansList"><div class="muted">Nenhum empréstimo ativo.</div></div>
+        <div style="height:10px"></div>
+        <button id="repayAllBtn" class="spin-btn secondary" style="width:100%">Pagar tudo</button>
+      </div>
+      <div style="height:12px"></div>
+      <div class="panel">
+        <h3>Histórico</h3>
+        <div id="history" class="log"></div>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="machine">
+        <div class="topinfo">
+          <div>
+            <div class="title">Kawagami Neon Slots</div>
+            <div class="subtitle">Estilo casa de apostas japonesa • 1 dia = 3 minutos</div>
+          </div>
+          <div style="text-align:right"><div class="muted">Aposta máxima recomendada: $1000</div></div>
+        </div>
+
+        <div class="reels-wrap" id="reelsWrap">
+          <div class="reel" id="reel1"><div class="strip"></div></div>
+          <div class="reel" id="reel2"><div class="strip"></div></div>
+          <div class="reel" id="reel3"><div class="strip"></div></div>
+        </div>
+
+        <div class="controls">
+          <div class="betbox">
+            <div class="muted" style="font-size:12px">Aposta $</div>
+            <input type="number" id="betInput" value="10" min="1" />
+            <button class="spin-btn secondary" id="minBetBtn">Min</button>
+            <button class="spin-btn secondary" id="maxBetBtn">Max</button>
+          </div>
+
+          <button class="spin-btn" id="spinBtn">GIRAR</button>
+          <button class="spin-btn secondary" id="autoBtn">AUTO: OFF</button>
+        </div>
+
+        <div class="result" id="resultText">—</div>
+        <div id="machineLog" class="log" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="side" style="align-self:flex-start">
+      <div class="panel">
+        <h3>Agiotas Disponíveis</h3>
+        <div id="lendersBox"></div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="panel">
+        <h3>Controles Rápidos</h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="saveBtn" class="spin-btn secondary">Salvar agora</button>
+          <button id="loadBtn" class="spin-btn secondary">Carregar</button>
+          <button id="resetBtn" class="spin-btn secondary">Resetar jogo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LENDERS MODAL -->
+  <div class="modal" id="lendersModal">
+    <div class="box">
+      <h3 style="color:var(--neon-1); margin-top:0">Agiotas — pedir empréstimo</h3>
+      <div id="lendersList"></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px">
+        <button id="closeLenders" class="spin-btn secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HACKER TERMINAL MODAL (new, harder) -->
+  <div class="modal" id="hackModal">
+    <div class="box">
+      <div class="terminal">
+        <div class="term-header">
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="dot"></div>
+            <div style="font-weight:800">TERMINAL • acesso root</div>
+          </div>
+          <div style="font-size:12px;color:var(--muted)">Modo: INVASÃO • Tentativas/dia: 1</div>
+        </div>
+
+        <div class="term-screen crt flicker" id="termScreen" style="position:relative;">
+          <div id="termOutput" style="white-space:pre-wrap; font-family:monospace;"></div>
+        </div>
+
+        <input id="termInput" class="term-input" placeholder="Digite o código exibido..." disabled />
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+          <div class="muted">Tempo restante: <span id="hackTimer">--</span>s</div>
+          <div style="display:flex;gap:8px">
+            <button id="startHackBtn" class="spin-btn">Iniciar Hack</button>
+            <button id="closeHackBtn" class="spin-btn secondary">Fechar</button>
+          </div>
+        </div>
+
+        <div class="muted" style="margin-top:8px">Regras: código aleatório (6-9 chars). Você tem 8s para digitar perfeitamente. Errou = preso.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY GAME OVER -->
+  <div class="overlay" id="gameOverOverlay">
+    <div class="box">
+      <h2 id="gameOverTitle">PRISÃO</h2>
+      <p id="gameOverMsg" style="margin:12px 0">Você foi preso por tentar hackear a máquina. Fim do jogo.</p>
+      <div style="height:10px"></div>
+      <button id="restartBtn" class="spin-btn">Reiniciar Jogo</button>
+    </div>
+  </div>
+
+<script>
+/* ===============================
+   STATE & CONFIG
+   =============================== */
+const symbols = ["🍒","🔔","⭐","🍋","💎","7️⃣"];
+const weights = [28,18,14,20,12,8];
+
+let money = 100.00;
+let score = 50;
+let currentDay = 1;
+let gameSeconds = 0; // seconds into current day
+const REAL_SECONDS_PER_DAY = 180; // 3 minutes = 180s
+
+let activeLoans = [];
+const lendersData = [
+  { id:1, name:"Tanaka Finanças", rateMonthly:0.08, max:300, minScore:20, desc:"8%/mês • limite $300"},
+  { id:2, name:"Kobayashi Corp", rateMonthly:0.12, max:800, minScore:40, desc:"12%/mês • limite $800"},
+  { id:3, name:"Yakuza Bank", rateMonthly:0.30, max:2000, minScore:65, desc:"30%/mês • limite $2000"},
+];
+
+let lastHackDay = -999; // stores day when hack was last attempted (enforces 1 attempt per day)
+
+/* --------------------------
+   UI refs
+   -------------------------- */
+const moneyHud = document.getElementById('moneyHud');
+const scoreHud = document.getElementById('scoreHud');
+const clockHud = document.getElementById('clockHud');
+
+const reelEls = [document.querySelector('#reel1 .strip'), document.querySelector('#reel2 .strip'), document.querySelector('#reel3 .strip')];
+const spinBtn = document.getElementById('spinBtn');
+const betInput = document.getElementById('betInput');
+const resultText = document.getElementById('resultText');
+const machineLog = document.getElementById('machineLog');
+const historyEl = document.getElementById('history');
+const lendersBox = document.getElementById('lendersBox');
+const activeLoansList = document.getElementById('activeLoansList');
+const lendersModal = document.getElementById('lendersModal');
+const lendersList = document.getElementById('lendersList');
+const openLendersBtn = document.getElementById('openLendersBtn');
+const closeLendersBtn = document.getElementById('closeLenders');
+const repayAllBtn = document.getElementById('repayAllBtn');
+
+const autoBtn = document.getElementById('autoBtn');
+let autoMode = false;
+let autoInterval = null;
+
+/* Hacker terminal refs */
+const hackModal = document.getElementById('hackModal');
+const openHackBtn = document.getElementById('openHackBtn');
+const closeHackBtn = document.getElementById('closeHackBtn');
+const startHackBtn = document.getElementById('startHackBtn');
+const termOutput = document.getElementById('termOutput');
+const termInput = document.getElementById('termInput');
+const hackTimerText = document.getElementById('hackTimer');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+const restartBtn = document.getElementById('restartBtn');
+
+/* audio context */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+/* --------------------------
+   UTIL FUNCTIONS
+   -------------------------- */
+function randWeighted(arr, weights){
+  const sum = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*sum;
+  for(let i=0;i<arr.length;i++){
+    if(r < weights[i]) return arr[i];
+    r -= weights[i];
+  }
+  return arr[arr.length-1];
+}
+function fmt(v){ return '$' + v.toFixed(2); }
+function padTime(sec){
+  const h = Math.floor(sec/3600)%24;
+  const m = Math.floor((sec%3600)/60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function log(msg){
+  const d = document.createElement('div');
+  d.innerHTML = `<small class="muted">${new Date().toLocaleTimeString()} — ${msg}</small>`;
+  historyEl.prepend(d);
+  machineLog.prepend(d.cloneNode(true));
+}
+
+/* --------------------------
+   INIT UI & STRIPS
+   -------------------------- */
+function updateHUD(){
+  moneyHud.textContent = fmt(money);
+  scoreHud.textContent = Math.max(0, Math.round(score));
+  clockHud.textContent = `Dia ${currentDay} • ${padTime(gameSeconds)}`;
+  renderLendersPanel();
+  renderActiveLoans();
+}
+function makeStripArr(){
+  const arr = [];
+  for(let i=0;i<20;i++) arr.push(randWeighted(symbols, weights));
+  return arr;
+}
+function renderStripsInitial(){
+  reelEls.forEach(el=>{
+    el.innerHTML = '';
+    const strip = makeStripArr();
+    strip.forEach(s=>{
+      const sEl = document.createElement('div');
+      sEl.className = 'symbol';
+      sEl.textContent = s;
+      el.appendChild(sEl);
+    });
+  });
+}
+renderStripsInitial();
+updateHUD();
+
+/* --------------------------
+   AUDIO FX
+   -------------------------- */
+function playBeep(freq=440, dur=0.15, type='sine', gainVal=0.06){
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gainVal, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.02);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+
+/* spin sound */
+function playSpinSound(){
+  playBeep(880,0.5,'sine',0.04);
+}
+
+/* win/lose */
+function playWin(){ playBeep(660,0.42,'triangle',0.08); playBeep(880,0.2,'sine',0.06); }
+function playLose(){ playBeep(140,0.45,'sine',0.06); }
+
+/* typing sound generator for terminal */
+function playTypeSound(){
+  // quick short click
+  playBeep(1200 + Math.random()*800, 0.03, 'square', 0.03);
+}
+
+/* siren sound on failure (longer) */
+let sirenNodes = [];
+function startSiren(){
+  const t = audioCtx.currentTime;
+  const o1 = audioCtx.createOscillator();
+  const o2 = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o1.type='sine'; o2.type='sine';
+  o1.frequency.setValueAtTime(450, t);
+  o2.frequency.setValueAtTime(800, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.15, t+0.05);
+  o1.connect(g); o2.connect(g); g.connect(audioCtx.destination);
+  o1.start(t); o2.start(t);
+  sirenNodes = [o1,o2,g];
+  // modulate frequency to get siren
+  let dir=1;
+  const sirenInterval = setInterval(()=> {
+    const now = audioCtx.currentTime;
+    const f1 = 400 + Math.random()*120 * (dir?1.2:0.8);
+    const f2 = 700 + Math.random()*150 * (dir?0.9:1.1);
+    o1.frequency.exponentialRampToValueAtTime(f1, now+0.12);
+    o2.frequency.exponentialRampToValueAtTime(f2, now+0.12);
+    dir = 1 - dir;
+  },120);
+  sirenNodes.push(sirenInterval);
+}
+function stopSiren(){
+  if(!sirenNodes.length) return;
+  const [o1,o2,g, interval] = sirenNodes;
+  if(interval) clearInterval(interval);
+  try{ o1.stop(); o2.stop(); }catch(e){}
+  try{ g.disconnect(); }catch(e){}
+  sirenNodes = [];
+}
+
+/* --------------------------
+   SLOTS: spin & evaluate
+   -------------------------- */
+let spinning = false;
+function spin(){
+  if(spinning) return;
+  let bet = Math.max(1, Math.floor(Number(betInput.value) || 1));
+  if(bet > 5000) bet = 5000;
+  if(bet > money){ alert('Saldo insuficiente para essa aposta'); return; }
+
+  spinning = true;
+  playSpinSound();
+  money -= bet; updateHUD();
+  log(`Apostou ${fmt(bet)} e girou os rolos.`);
+
+  const results = [randWeighted(symbols, weights), randWeighted(symbols, weights), randWeighted(symbols, weights)];
+
+  reelEls.forEach((el, idx) => {
+    const strip = [];
+    for(let i=0;i<10;i++) strip.push(randWeighted(symbols, weights));
+    const midIndex = 4;
+    strip[midIndex] = results[idx];
+    el.innerHTML = '';
+    strip.forEach(s=>{
+      const sEl = document.createElement('div'); sEl.className='symbol'; sEl.textContent = s; el.appendChild(sEl);
+    });
+    const shift = - midIndex * 180;
+    setTimeout(()=>{ el.style.transition = `transform ${900 + idx*220}ms cubic-bezier(.18,.9,.28,1)`; el.style.transform = `translateY(${shift}px)`; }, idx*160);
+  });
+
+  setTimeout(()=> {
+    const center = reelEls.map(el => el.children[4].textContent);
+    evaluateSpin(center, bet);
+    setTimeout(()=> { renderStripsInitial(); reelEls.forEach(el=> el.style.transform='translateY(0)'); spinning=false; }, 300);
+  }, 1800);
+}
+
+function evaluateSpin(symb, bet){
+  const [a,b,c] = symb;
+  let payout=0;
+  if(a===b && b===c){
+    if(a==='7️⃣') payout = bet * 50;
+    else if(a==='💎') payout = bet * 20;
+    else if(a==='⭐') payout = bet * 10;
+    else payout = bet * 5;
+  } else if(a===b || a===c || b===c){
+    payout = bet * 2;
+  } else payout = 0;
+
+  if(payout>0){
+    money += payout; score = Math.min(100, score + Math.min(8, Math.floor(payout/10)));
+    resultText.style.color = 'var(--win)'; resultText.textContent = `GANHOU ${fmt(payout)}! (${symb.join(' | ')})`;
+    playWin(); log(`Resultado: ${symb.join(' | ')} — ganhou ${fmt(payout)}`);
+  } else {
+    score = Math.max(0, score - 3);
+    resultText.style.color = 'var(--muted)'; resultText.textContent = `Perdeu ${fmt(bet)} • ${symb.join(' | ')}`;
+    playLose(); log(`Resultado: ${symb.join(' | ')} — perdeu ${fmt(bet)}`);
+  }
+  updateHUD(); checkBankruptcy();
+}
+
+/* --------------------------
+   LENDERS & LOANS
+   -------------------------- */
+function renderLendersPanel(){
+  lendersBox.innerHTML = '';
+  lendersData.forEach(l=>{
+    const d = document.createElement('div'); d.className='lender';
+    d.innerHTML = `<div><div style="font-weight:800">${l.name}</div><div class="meta">${l.desc} • score mínimo ${l.minScore}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><div class="meta">Limite: ${fmt(l.max)}</div><div><button class="spin-btn secondary" onclick="openBorrowModal(${l.id})">Pedir</button></div></div>`;
+    lendersBox.appendChild(d);
+  });
+}
+
+function renderActiveLoans(){
+  activeLoansList.innerHTML = '';
+  if(activeLoans.length===0){ activeLoansList.innerHTML = '<div class="muted">Nenhum empréstimo ativo.</div>'; return; }
+  activeLoans.forEach(loan=>{
+    const daysLeft = loan.dueDay - currentDay;
+    const el = document.createElement('div'); el.className='lender';
+    const totalApprox = loan.principal + loan.principal * loan.rateMonthly;
+    el.innerHTML = `<div><div style="font-weight:800">${loan.lenderName} • ${fmt(loan.principal)}</div><div class="meta">Vence dia ${loan.dueDay} • ${daysLeft} dias restantes</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><div class="meta">Total aprox: ${fmt(totalApprox)}</div><div style="display:flex;gap:6px"><button class="spin-btn" onclick="repayLoan('${loan.id}')">Pagar</button><button class="spin-btn secondary" onclick="extendLoan('${loan.id}')">Pedir prazo</button></div></div>`;
+    activeLoansList.appendChild(el);
+  });
+}
+
+function openBorrowModal(lenderId){
+  lendersModal.style.display = 'flex';
+  lendersList.innerHTML = '';
+  const l = lendersData.find(x=>x.id===lenderId);
+  if(!l) return;
+  const cont = document.createElement('div');
+  cont.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px"><div><div style="font-weight:900">${l.name}</div><div class="muted">${l.desc} • score mínimo ${l.minScore}</div></div><div style="text-align:right"><div class="muted">Limite</div><div style="font-weight:800">${fmt(l.max)}</div></div></div><div style="display:flex;gap:8px;align-items:center"><input id="borrowAmount" type="number" placeholder="Valor" min="1" value="${Math.min(50, l.max)}" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit" /><button id="confirmBorrow" class="spin-btn">Confirmar</button></div>`;
+  lendersList.appendChild(cont);
+  document.getElementById('confirmBorrow').onclick = () => {
+    const val = Math.max(1, Number(document.getElementById('borrowAmount').value||0));
+    if(val <= 0 || val > l.max){ alert('Valor inválido ou acima do limite'); return; }
+    if(score < l.minScore){ alert(`Score insuficiente (${score}). ${l.name} exige ${l.minScore}.`); return; }
+    const loan = { id: String(Date.now()+Math.random()), lenderId:l.id, lenderName:l.name, principal:val, rateMonthly:l.rateMonthly, borrowDay:currentDay, dueDay: currentDay + 30 };
+    activeLoans.push(loan);
+    money += val; score = Math.max(0, score - 5);
+    log(`Pegou empréstimo ${fmt(val)} de ${l.name}. Vence dia ${loan.dueDay}.`); updateHUD(); lendersModal.style.display='none'; saveState();
+  };
+}
+
+function repayLoan(id){
+  const idx = activeLoans.findIndex(l=>l.id===id);
+  if(idx===-1) return alert('Empréstimo não encontrado');
+  const loan = activeLoans[idx];
+  const due = loan.principal + loan.principal * loan.rateMonthly;
+  if(money < due){
+    if(!confirm(`Não tem ${fmt(due)}. Deseja pagar parcialmente (${fmt(money)})?`)) return;
+    const paid = money; money = 0; loan.principal = Math.max(0, loan.principal - paid); score = Math.max(0, score - 8);
+    log(`Pagou ${fmt(paid)} parcialmente do empréstimo de ${loan.lenderName}. Restou ${fmt(loan.principal)}.`); updateHUD(); saveState(); return;
+  }
+  money -= due; activeLoans.splice(idx,1); score = Math.min(100, score + 6); log(`Quitou empréstimo de ${loan.lenderName} pagando ${fmt(due)}.`); updateHUD(); saveState();
+}
+
+function extendLoan(id){
+  const loan = activeLoans.find(l=>l.id===id);
+  if(!loan) return;
+  const penalty = loan.principal * 0.05;
+  if(!confirm(`Pedir +7 dias cobrará multa de ${fmt(penalty)} agora. Aceitar?`)) return;
+  if(money < penalty) return alert('Saldo insuficiente para multa.');
+  money -= penalty; loan.dueDay += 7; score = Math.max(0, score - 6);
+  log(`Pediu extensão em ${loan.lenderName}. Multa ${fmt(penalty)}. Novo vencimento: dia ${loan.dueDay}`); updateHUD(); saveState();
+}
+
+/* check deadlines */
+function checkLoanDeadlines(){
+  const overdue = activeLoans.filter(l => currentDay > l.dueDay);
+  overdue.forEach(l=>{
+    log(`Empréstimo em atraso: ${l.lenderName}. Dívida executada.`);
+    money = 0; score = Math.max(0, score - 20); l.principal *= 1.15;
+  });
+  updateHUD(); saveState();
+}
+
+/* --------------------------
+   TIME: tick every real second
+   -------------------------- */
+const INGAME_SECONDS_PER_REAL_SECOND = 86400 / REAL_SECONDS_PER_DAY;
+function tick(){
+  gameSeconds += INGAME_SECONDS_PER_REAL_SECOND;
+  if(gameSeconds >= 86400){ gameSeconds -= 86400; currentDay += 1; log(`Dia avançou: Dia ${currentDay}`); checkLoanDeadlines(); lastHackDay = lastHackDay; } // lastHackDay kept
+  updateHUD();
+}
+setInterval(tick, 1000);
+
+/* --------------------------
+   SAVE / LOAD
+   -------------------------- */
+function saveState(){ const state = {money, score, currentDay, gameSeconds, activeLoans, lastHackDay}; localStorage.setItem('slots_state_v3', JSON.stringify(state)); log('Estado salvo.'); }
+function loadState(){ const s = localStorage.getItem('slots_state_v3'); if(!s) return; try{ const st = JSON.parse(s); money = st.money ?? money; score = st.score ?? score; currentDay = st.currentDay ?? currentDay; gameSeconds = st.gameSeconds ?? gameSeconds; activeLoans = st.activeLoans ?? activeLoans; lastHackDay = st.lastHackDay ?? lastHackDay; log('Estado carregado do storage.'); updateHUD(); }catch(e){ console.warn(e); } }
+document.getElementById('saveBtn').addEventListener('click', saveState);
+document.getElementById('loadBtn').addEventListener('click', ()=>{ loadState(); updateHUD(); });
+document.getElementById('resetBtn').addEventListener('click', ()=>{ if(confirm('Resetar o jogo?')){ localStorage.removeItem('slots_state_v3'); location.reload(); } });
+
+/* --------------------------
+   UI events
+   -------------------------- */
+spinBtn.addEventListener('click', ()=>{ spin(); saveState(); });
+document.getElementById('minBetBtn').addEventListener('click', ()=> betInput.value = 1);
+document.getElementById('maxBetBtn').addEventListener('click', ()=> betInput.value = Math.floor(money) || 100);
+
+autoBtn.addEventListener('click', ()=>{
+  autoMode = !autoMode; autoBtn.textContent = autoMode ? 'AUTO: ON' : 'AUTO: OFF';
+  if(autoMode){
+    autoInterval = setInterval(()=>{ if(money <= 0){ clearInterval(autoInterval); autoMode=false; autoBtn.textContent='AUTO: OFF'; return; } spin(); }, 1400);
+  } else clearInterval(autoInterval);
+});
+
+openLendersBtn.addEventListener('click', ()=>{ lendersModal.style.display='flex'; renderLendersList(); });
+closeLendersBtn.addEventListener('click', ()=> lendersModal.style.display='none');
+
+function renderLendersList(){
+  lendersList.innerHTML = '';
+  lendersData.forEach(l=>{
+    const node = document.createElement('div'); node.className='lender';
+    node.innerHTML = `<div><div style="font-weight:900">${l.name}</div><div class="meta">${l.desc} • score mínimo ${l.minScore}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end"><div class="meta">Limite: ${fmt(l.max)}</div><div style="display:flex;gap:8px"><button class="spin-btn" onclick="openBorrowModal(${l.id})">Pedir</button></div></div>`;
+    lendersList.appendChild(node);
+  });
+}
+
+/* bankruptcy check */
+function checkBankruptcy(){ if(money <= 0){ money = 0; updateHUD(); log('Seu saldo é $0 — considere pedir um empréstimo.'); } }
+
+/* --------------------------
+   HACKER TERMINAL: NEW DIFFICULT CORE
+   -------------------------- */
+let hackAttemptActive = false;
+let hackTimer = null;
+let hackTimeLeft = 0;
+let currentHackCode = '';
+const HACK_TIME_LIMIT = 8; // seconds to type
+const HACK_MIN_LEN = 6;
+const HACK_MAX_LEN = 9;
+const HACK_REWARD = 100;
+const HACK_SCORE_REWARD = 5;
+
+function genHackCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // avoid ambiguous 0/O, 1/I
+  const len = Math.floor(Math.random() * (HACK_MAX_LEN - HACK_MIN_LEN + 1)) + HACK_MIN_LEN;
+  let s = '';
+  for(let i=0;i<len;i++) s += chars.charAt(Math.floor(Math.random()*chars.length));
+  return s;
+}
+
+/* typing effect to show code (character by character) */
+async function showCodeTyping(code){
+  termOutput.textContent = '';
+  termInput.value = '';
+  termInput.disabled = true;
+  const lines = [
+    '>>> INICIANDO SEQUÊNCIA DE INTRUSÃO',
+    `>>> ALVO: kawagami_slots_core`,
+    `>>> GERANDO CÓDIGO TEMPORÁRIO [${code.length} chars]`,
+    '',
+  ];
+  // print header lines quickly
+  for(const ln of lines){
+    termOutput.textContent += ln + '\n';
+    await sleep(180);
+  }
+  // now type the code char-by-char with typing sound and slight flicker
+  for(let i=0;i<code.length;i++){
+    const ch = code[i];
+    termOutput.textContent += ch;
+    playTypeSound();
+    await sleep(140 + Math.random()*80);
+  }
+  termOutput.textContent += '\n\n>>> COPIE O CÓDIGO E DIGITE ABAIXO';
+  termInput.disabled = false;
+  termInput.focus();
+}
+
+/* small sleep util returning a promise */
+function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+/* start hack handler */
+startHackBtn.addEventListener('click', async ()=>{
+  // one attempt per day
+  if(lastHackDay === currentDay){
+    alert('Você já tentou um hack hoje. Tente novamente amanhã (no jogo).');
+    return;
+  }
+  // prepare code and show typing
+  currentHackCode = genHackCode();
+  lastHackDay = currentDay; // mark attempted today (even if fail)
+  saveState();
+  hackAttemptActive = true;
+  await showCodeTyping(currentHackCode);
+  // start countdown
+  hackTimeLeft = HACK_TIME_LIMIT;
+  hackTimerText.textContent = hackTimeLeft;
+  if(hackTimer) clearInterval(hackTimer);
+  hackTimer = setInterval(()=>{
+    hackTimeLeft--;
+    hackTimerText.textContent = hackTimeLeft;
+    if(hackTimeLeft <= 0){
+      clearInterval(hackTimer); hackTimer = null;
+      if(hackAttemptActive) handleHackFail();
+    }
+  }, 1000);
+});
+
+/* when user submits by pressing Enter in input */
+termInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter' && hackAttemptActive){
+    e.preventDefault();
+    const val = termInput.value.trim().toUpperCase();
+    if(val === currentHackCode){
+      handleHackSuccess();
+    } else {
+      handleHackFail();
+    }
+  }
+});
+
+function handleHackSuccess(){
+  if(!hackAttemptActive) return;
+  hackAttemptActive = false;
+  if(hackTimer){ clearInterval(hackTimer); hackTimer = null; }
+  money += HACK_REWARD; score = Math.min(100, score + HACK_SCORE_REWARD);
+  log(`Hacker: sucesso — ganhou ${fmt(HACK_REWARD)}.`);
+  alert(`Hacking bem-sucedido! Você ganhou ${fmt(HACK_REWARD)} e +${HACK_SCORE_REWARD} de score.`);
+  termInput.disabled = true;
+  hackModal.style.display = 'none';
+  updateHUD(); saveState();
+}
+
+/* handle fail: siren + ARREST + GAME OVER (freeze) */
+function handleHackFail(){
+  if(!hackAttemptActive) return;
+  hackAttemptActive = false;
+  if(hackTimer){ clearInterval(hackTimer); hackTimer = null; }
+  // play siren
+  startSiren();
+  // visual flash red on terminal briefly
+  const termScreen = document.getElementById('termScreen');
+  termScreen.style.transition = 'background 0.12s';
+  termScreen.style.background = 'linear-gradient(180deg, rgba(32,0,0,0.6), rgba(80,0,0,0.6))';
+  setTimeout(()=>{ termScreen.style.background = ''; }, 800);
+
+  log('Hacker: falhou. Prisão declarada.');
+  // show overlay arrest + freeze game
+  document.getElementById('gameOverTitle').textContent = 'PRISÃO';
+  document.getElementById('gameOverMsg').textContent = 'Você foi preso por tentar hackear a máquina. Fim do jogo.';
+  gameOverOverlay.style.display = 'flex';
+  disableGame();
+
+  // optionally clear stored state to enforce full loss (user requested "lose the game")
+  // keep overlay so user must click Restart to reset
+  saveState(); // keep state timestamp
+  // play siren for a few seconds then stop (let it ring)
+  setTimeout(()=> stopSiren(), 4500);
+}
+
+/* open/close hack modal */
+openHackBtn.addEventListener('click', ()=> {
+  // enable modal
+  // Before opening, show message if already attempted today
+  if(lastHackDay === currentDay){
+    if(!confirm('Você já tentou hack hoje. Ainda deseja abrir o terminal (não poderá tentar outro hack hoje)?')) return;
+  }
+  hackModal.style.display = 'flex';
+  // reset terminal display
+  termOutput.textContent = '>>> TERMINAL PRONTO\n';
+  termInput.value = '';
+  termInput.disabled = true;
+  hackTimerText.textContent = '--';
+});
+closeHackBtn.addEventListener('click', ()=> {
+  hackModal.style.display = 'none';
+  if(hackTimer){ clearInterval(hackTimer); hackTimer = null; hackAttemptActive = false; }
+});
+
+/* disable whole game (upon arrest) */
+function disableGame(){
+  spinBtn.disabled = true; betInput.disabled = true; autoBtn.disabled = true; openLendersBtn.disabled = true; openHackBtn.disabled = true;
+}
+
+/* restart action */
+restartBtn.addEventListener('click', ()=>{
+  localStorage.removeItem('slots_state_v3');
+  location.reload();
+});
+
+/* --------------------------
+   INIT & misc
+   -------------------------- */
+function init(){
+  renderLendersPanel();
+  renderStripsInitial();
+  loadState();
+  updateHUD();
+}
+init();
+
+/* expose some functions globally for inline handlers */
+window.openBorrowModal = openBorrowModal;
+window.repayLoan = repayLoan;
+window.extendLoan = extendLoan;
+
+/* keyboard space to spin */
+document.addEventListener('keydown', (e)=>{ if(e.code === 'Space'){ e.preventDefault(); spin(); } });
+
+/* periodic save */
+setInterval(saveState, 15000);
+
+</script>
+</body>
+</html>
